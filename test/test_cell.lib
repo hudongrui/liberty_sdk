@@ -25,6 +25,12 @@ library(cells) {
             direction: output;
             function: "FF";
         }
+        pin (ADR[8]) {
+            related_ground_pin : VSS;
+            related_power_pin : VDD;
+            max_transition : 0.54;
+            capacitance : 0.0011416;
+      }
     }
     cell (AND2) {
         area : 1;
