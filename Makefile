@@ -10,7 +10,10 @@ VERSION = v1.0
 .PHONY: build release test clean all
 
 # Usage:
-# $ make test TEST_MODULE=parser
+# $ make test
 test:
-	@echo "[`date`] Running Python unittest under test directory ..."
-	@python3 -m unittest $(TEST_MODULE)
+	@echo "[`date`] Running Python unittest under directory 'unit_test'..."
+	@python3 -m unittest -v unit_test.test_parser
+
+clean:
+	@rm -rf *.log tmp/*
