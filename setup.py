@@ -9,7 +9,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'liberty_parser=main:main',
+            'liberty_parser=main:main',  # TODO: Fix this entry point
         ],
     },
     author='dongruihu',

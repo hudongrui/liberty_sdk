@@ -2,7 +2,7 @@
 
 ## Overview
 
-`liberty_sdk` It provides a set of tools and libraries to help developers [describe what developers can do with the SDK].
+`liberty_sdk` is a Python software develop kit for working with Synopsys Liberty standard.
 
 ## Liberty Format Reference
 Reference: https://media.c3d2.de/mgoblin_media/media_entries/659/Liberty_User_Guides_and_Reference_Manual_Suite_Version_2017.06.pdf
@@ -12,6 +12,7 @@ Reference: https://media.c3d2.de/mgoblin_media/media_entries/659/Liberty_User_Gu
 - **Parser**: Parses Liberty files and converts them into a structured format.
 - **JSON Serialization**: Converts parsed Liberty files into JSON format.
 - **Liberty File Generation**: Generates Liberty files from the parsed data structure.
+- **Compare Lib**: Compare cell/pin, measurement and project setup for LIB
 
 ## Project Structure
 
