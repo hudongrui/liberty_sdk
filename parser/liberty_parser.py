@@ -25,11 +25,34 @@ class ParseError(Exception):
         super().__init__(f"Line {line}: {msg}" if line else msg)
 
 
-def indent(level=0, separator='\t'):
+def indent(level=0, separator='  '):
     indentation = ''
     for _ in range(level):
         indentation += separator
     return indentation
+
+
+def list2dict(l):
+    """
+    Convert a list of kv-pairs to dict. Such as:
+    [{"cell": "AND2"}, {"pin": "o"}] -> {{"cell": "AND2"}, {"pin": "o"}}
+    """
+    d = {}
+    for kv_pair in l:
+        d.update(kv_pair)
+
+    return d
+
+
+def dict2list(d):
+    """
+    Convert dict (kwargs) to a list of kv-pairs
+    """
+    kv_pairs = []
+    for k, v in d.items():
+        kv_pairs.append({k: v})
+
+    return kv_pairs
 
 
 class TokenType(Enum):
@@ -56,7 +79,13 @@ class LibertyAttribute:
     def __hash__(self):
         return hash(repr(self))
 
-    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+    def get(self):
+        return self.value
+
+    def match(self, k):
+        return self.name == k
+
+    def dump(self, level=0, indent_value=True, indent_separator='  '):
         data = f"{indent(level=level, separator=indent_separator)}{self.name}: ("
         if self.name == "values" and indent_value:  # For certain attributes, indent
             data += f" \\\n{indent(level=level+1, separator=indent_separator)}\"{self.value}\" \\\n{indent(level=level, separator=indent_separator)});\n"
@@ -82,7 +111,16 @@ class ComplexLibertyAttribute:
     def __hash__(self):
         return hash(repr(self))
 
-    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+    def __repr__(self):
+        return f"{self.name}: ({', '.join(self.params)})"
+
+    def get(self):
+        return self.params
+
+    def match(self, k, v=None):
+        return self.name == k
+
+    def dump(self, level=0, indent_value=True, indent_separator='  '):
         data = f"{indent(level=level, separator=indent_separator)}{self.name} ("
 
         # Value section
@@ -112,7 +150,7 @@ class LibertyGroup:
     def __hash__(self):
         return hash(repr(self))
 
-    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+    def dump(self, level=0, indent_value=True, indent_separator='  '):
         data = f"{indent(level=level, separator=indent_separator)}{self.group_type} ({self.name}) {{\n"
         for k, v in self.params.items():
             data += f"{indent(level=level + 1, separator=indent_separator)}{k}: {v};\n"
@@ -125,6 +163,47 @@ class LibertyGroup:
 
         data += f"{indent(level=level, separator=indent_separator)}}}\n"
         return data
+
+    def match(self, k, v=None):
+        if v:
+            return self.group_type == k and self.name == v
+        else:
+            return self.group_type == k
+
+    @lru_cache(maxsize=1024)
+    def get(self, *args, **kwargs):
+        if args:
+            # TODO: Support arg list later.
+            # if len(args) > 1:
+            #     value_list = []
+            #     for k in args:
+            #         # self.params - Simple Attribute
+            #         value_list.append(self.params.get(k))
+            #     return value_list
+            # else:
+            key = args[0]
+            if not self.params.get(key):
+                # Liberty Group
+                value_list = []
+                for child in self.children:
+                    if child.match(key):
+                        value_list.append(child.get())
+                return value_list[0] if len(value_list) == 1 else value_list
+            else:
+                # Simple Liberty attribute
+                return self.params.get(args[0])
+        if kwargs:
+            # logger.info(kwargs)
+            for child in self.children:
+                k0 = dict2list(kwargs)[0]
+                for k, v in k0.items():
+                    if child.match(k, v):
+                        # logger.debug(f"Found item with current key: {k0}")
+                        k1 = dict2list(kwargs)[1:]
+                        # logger.debug(f"Using rest of key: {list2dict(k1)}")
+                        return child.get(**list2dict(k1))
+
+        return self
 
     @lru_cache(maxsize=1024)
     def asdict(self):
@@ -234,10 +313,6 @@ class LibertyParser:
             return value
 
         elif self._peek().value == ',':  # Value list continues
-            # if self._current().type == TokenType.STRING:
-            #     str_value = f'"{self._current().value}"'
-            # else:
-            #     str_value = self._current().value
             value.append(self._current().value)
             return self._parse_value(value)
 
@@ -307,6 +382,10 @@ class LibertyParser:
         return group
 
     def _consume(self, expected):
+        """
+        Expect and consume the next token.
+        If not expected, raise exception.
+        """
         if self._current().value != expected:
             raise ParseError(
                 f"Expected '{expected}', got '{self._current().value}'",
@@ -322,7 +401,7 @@ class LibertyParser:
 
     def _advance(self) -> None:
         """
-        移动到下一个Token
+        Advance to the next token
         :return:
         """
         self.current_token += 1
@@ -333,7 +412,7 @@ class LibertyParser:
 
     def _peek(self) -> Optional[LibertyToken]:
         """
-        预读下一个Token，不移动指针
+        Peek at the next token, without moving cursor
         :return:
         """
         next_pos = self.current_token + 1

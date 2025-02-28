@@ -1,28 +1,7 @@
 #!usr/bin/python3
 import json
-import logging
-import colorlog
+from tools.logger import setup_logger
 from parser.liberty_parser import LibertyParser, LibertyJSONEncoder
-
-
-def setup_logger(log_file, level=logging.DEBUG):
-    stdout_handler = colorlog.StreamHandler()
-    stdout_handler.setFormatter(colorlog.ColoredFormatter(
-        '%(log_color)s [%(asctime)s] | %(levelname)s | %(message)s', "%Y-%m-%d %H:%M:%S"))
-    # stdout_handler.setLevel(level)
-
-    file_handler = logging.FileHandler(log_file, mode='w+')
-    formatter = logging.Formatter('[%(asctime)s] | %(levelname)s | %(message)s', "%Y-%m-%d %H:%M:%S")
-    file_handler.setFormatter(formatter)
-    # file_handler.setLevel(level)
-
-    logger = logging.getLogger("main")
-    logger.handlers.clear()
-    logger.addHandler(stdout_handler)
-    logger.addHandler(file_handler)
-    logger.setLevel(level)
-
-    return logger
 
 
 logger = setup_logger(log_file="parser.log")
@@ -44,4 +23,41 @@ output_lib = 'test/output_cell.lib'
 with open(output_lib, 'w') as f:
     f.write(library.dump(indent_value=True, indent_separator='  '))
 
+# Generate Test
 assert library.name == "cells"
+
+# Test Simple Attribute
+attr = library.get('voltage_unit')
+logger.info(f"Test attribute 'voltage_unit': {attr}")
+assert attr == '"1V"'
+
+# Test Complex Attribute
+attr = library.get('voltage_map')
+logger.info(f"Test attribute: 'voltage_map': {attr}, type: {type(attr)}")
+assert str(attr) == "[['VDD', '0.75'], ['VSS', '0'], ['GND', '0']]"
+
+# Test nested complex attribute
+pin = library.get(cell='DFF', pin='ADR[8]')
+logger.info(f"Type of Pin: {type(pin)}")
+logger.info(pin)
+logger.info(pin.dump())
+
+# Test other cases
+template = library.get(lu_table_template='delay_temp_3x3')
+logger.info(template)
+idx = template.get("index_1")
+logger.info(f"Test for index_1: {idx}")
+# logger.info(idx.dump())
+assert idx == '1.0, 2.0, 3.0'
+
+# Test nested complex attribute
+p = library.get(cell='AND2', pin='o', timing="", cell_rise="delay_temp_3x3")
+# measure = p.get(timing="", cell_rise="delay_temp_3x3")
+values = p.get("values")
+logger.info(values)
+
+# Test SET
+library.set(comment="This is a comment")
+
+# Set nested complex attributes
+library.set(cell='AND2', pin='o', timing="", cell_rise="delay_temp_3x3", values="value set")
