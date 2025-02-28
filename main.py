@@ -27,14 +27,21 @@ def setup_logger(log_file, level=logging.DEBUG):
 
 logger = setup_logger(log_file="parser.log")
 
+"""Parse"""
 test_lib = 'test/test_cell.lib'
 parser = LibertyParser(test_lib)
 logger.info(f"Using {test_lib}")
 library = parser.parse()
 logger.info(f"Parse success. <{type(library)}>")
 
+"""Lib2Json"""
 output_json = 'test/test_cell.json'
 with open(output_json, 'w') as f:
     json.dump(library, f, cls=LibertyJSONEncoder, indent=2)
+
+"""LibClass2File"""
+output_lib = 'test/output_cell.lib'
+with open(output_lib, 'w') as f:
+    f.write(library.dump(indent_value=True, indent_separator='  '))
 
 assert library.name == "cells"

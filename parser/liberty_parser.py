@@ -25,6 +25,13 @@ class ParseError(Exception):
         super().__init__(f"Line {line}: {msg}" if line else msg)
 
 
+def indent(level=0, separator='\t'):
+    indentation = ''
+    for _ in range(level):
+        indentation += separator
+    return indentation
+
+
 class TokenType(Enum):
     IDENTIFIER = 1
     STRING = 2
@@ -49,6 +56,15 @@ class LibertyAttribute:
     def __hash__(self):
         return hash(repr(self))
 
+    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+        data = f"{indent(level=level, separator=indent_separator)}{self.name}: ("
+        if self.name == "values" and indent_value:  # For certain attributes, indent
+            data += f" \\\n{indent(level=level+1, separator=indent_separator)}\"{self.value}\" \\\n{indent(level=level, separator=indent_separator)});\n"
+        else:
+            data += f"\"{self.value}\");\n"
+
+        return data
+
     @lru_cache(maxsize=1024)
     def asdict(self):
         return self.value
@@ -66,6 +82,21 @@ class ComplexLibertyAttribute:
     def __hash__(self):
         return hash(repr(self))
 
+    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+        data = f"{indent(level=level, separator=indent_separator)}{self.name} ("
+
+        # Value section
+        if self.name == 'values' and indent_value is True:
+            data += f" \\\n{indent(level=level+1, separator=indent_separator)}"
+            params = list(map(lambda x: f'"{x}"', self.params))
+            data += f", \\\n{indent(level=level+1, separator=indent_separator)}".join(params)
+            data += f"\\\n{indent(level=level, separator=indent_separator)}"
+        else:
+            data += ", ".join(self.params)
+        data += ");\n"
+
+        return data
+
     @lru_cache(maxsize=1024)
     def asdict(self):
         return self.params
@@ -81,12 +112,28 @@ class LibertyGroup:
     def __hash__(self):
         return hash(repr(self))
 
+    def dump(self, level=0, indent_value=False, indent_separator='\t'):
+        data = f"{indent(level=level, separator=indent_separator)}{self.group_type} ({self.name}) {{\n"
+        for k, v in self.params.items():
+            data += f"{indent(level=level + 1, separator=indent_separator)}{k}: {v};\n"
+
+        for child in self.children:
+            data += child.dump(
+                level=level + 1,
+                indent_value=indent_value,
+                indent_separator=indent_separator)
+
+        data += f"{indent(level=level, separator=indent_separator)}}}\n"
+        return data
+
     @lru_cache(maxsize=1024)
     def asdict(self):
         data = {}
 
         # Group Type
-        data[self.group_type] = self.name
+        data['type'] = self.group_type
+        data['name'] = self.name
+        # data[self.group_type] = self.name
 
         # Simple Attributes
         for k, v in self.params.items():
@@ -94,13 +141,15 @@ class LibertyGroup:
 
         # Complex Attributes
         for g in self.children:
-            # data[g.name] = g.asdict()
             if isinstance(g, (LibertyAttribute, ComplexLibertyAttribute)):
                 data[g.name] = g.asdict()
             elif isinstance(g, LibertyGroup):
                 # using special separator as values
-                instance_name = f"#&#{g.group_type}#&#{g.name}"
-                data[instance_name] = g.asdict()
+                if 'group' not in data.keys():
+                    data['group'] = []
+                data['group'].append(g.asdict())
+                # instance_name = f"#&#{g.group_type}#&#{g.name}"  # Use unique name as key
+                # data[instance_name] = g.asdict()
             else:
                 raise ParseError(f"Unrecognized data type: {type(g)}")
 
@@ -112,15 +161,19 @@ class LibertyParser:
         (?P<keyword>\b(?:library|cell|pin|direction|timing|related_pin|cell_rise|values)\b) |
         (?P<string>"[^"]*") |
         (?P<number>[-+]?\d+\.?\d*) |
-        (?P<symbol>[(){},:;]) |
+        (?P<symbol>[(){},:;\[\]]) |
         (?P<identifier>\w+)
     """, re.VERBOSE)
 
     def __init__(self, file_path):
+        """
+        Liberty File parser
+        Args:
+            file_path:
+        """
         self.file_path = file_path
         self.tokens: List[LibertyToken] = []
         self.current_token = 0
-        # TODO: Handle  bus_naming_style : "%s[%d]";
 
     def parse(self) -> LibertyGroup:
         """
@@ -181,6 +234,10 @@ class LibertyParser:
             return value
 
         elif self._peek().value == ',':  # Value list continues
+            # if self._current().type == TokenType.STRING:
+            #     str_value = f'"{self._current().value}"'
+            # else:
+            #     str_value = self._current().value
             value.append(self._current().value)
             return self._parse_value(value)
 
@@ -189,7 +246,6 @@ class LibertyParser:
 
         self._advance()
         self._consume('(')
-        # logger.info(f"Line: {self._current().line} Peek: {self._peek().value}")
 
         # LibertyGroup clause w/ name
         name = self._current().value  # Such as "AND2X1"
@@ -202,10 +258,21 @@ class LibertyParser:
             attr.set_values(self._parse_value([self._current().value]))
             logger.debug(f"Parsed ComplexAttribute: {attr}")
             return attr
+        elif self._peek().value == '[':  # Begin to parse pin, such as ADR[8]
+            self._advance()
+            name += self._current().value  # Add '['
+            # logger.info(f"{self._current().value}, Next: {self._peek().value}, Peek: {self._peek()}")
+            while self._peek().value != ']':
+                self._advance()
+                name += self._current().value
+            self._advance()
+            name += self._current().value  # Add ']'
+            # Done parsing PIN name, procede as normal
+            self._advance()
+            self._consume(')')
         else:
             self._advance()
             self._consume(')')
-        # logger.debug(f"name: {name}")
 
         try:
             self._consume('{')
@@ -225,10 +292,16 @@ class LibertyParser:
                 self._advance()
                 self._consume(':')
                 value = self._current().value
+
+                # Differentiate STRING | IDENTIFIER TOKEN
+                if self._current().type == TokenType.STRING:
+                    value = f'"{value}"'
+
                 self._advance()
                 self._consume(';')
                 group.params[key] = value
-                logger.debug(f"Assign attribute - {key}: {value}")
+                # logger.debug(f"Assign attribute - {key}: {value}")
+
         self._advance()  # Skip }
         logger.debug(f'Parsed Group: {group}')
         return group
@@ -253,6 +326,10 @@ class LibertyParser:
         :return:
         """
         self.current_token += 1
+
+    def _prev(self) -> Optional[LibertyToken]:
+        prev_pos = self.current_token - 1
+        return self.tokens[prev_pos] if prev_pos >= 0 else None
 
     def _peek(self) -> Optional[LibertyToken]:
         """
