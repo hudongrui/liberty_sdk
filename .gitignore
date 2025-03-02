@@ -1,5 +1,8 @@
 *.log
 tmp
 venv
+dist
+build
+*.egg-info
 .idea
 __pycache__

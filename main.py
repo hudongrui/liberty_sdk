@@ -1,7 +1,7 @@
 #!usr/bin/python3
 import json
-from tools.logger import setup_logger
-from parser.liberty_parser import LibertyParser, LibertyJSONEncoder
+from liberty_sdk.tools.logger import setup_logger
+from liberty_sdk.parser.liberty_parser import LibertyParser, LibertyJSONEncoder
 
 
 logger = setup_logger(log_file="parser.log")

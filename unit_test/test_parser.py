@@ -1,8 +1,8 @@
 import os
 import json
 import unittest
-from tools.logger import setup_logger
-from parser.liberty_parser import LibertyParser, LibertyJSONEncoder, LibertyGroup
+from liberty_sdk.tools.logger import setup_logger
+from liberty_sdk.parser.liberty_parser import LibertyParser, LibertyJSONEncoder, LibertyGroup
 
 logger = setup_logger(log_file="unittest.log")
 

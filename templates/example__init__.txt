@@ -1,0 +1,2 @@
+from .parser import *  # NOTE: Update this when new module added.
+__version__ = 'VERSION_INFO'

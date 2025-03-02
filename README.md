@@ -12,7 +12,8 @@ Reference: https://media.c3d2.de/mgoblin_media/media_entries/659/Liberty_User_Gu
 - **Parser**: Parses Liberty files and converts them into a structured format.
 - **JSON Serialization**: Converts parsed Liberty files into JSON format.
 - **Liberty File Generation**: Generates Liberty files from the parsed data structure.
-- **Compare Lib**: Compare cell/pin, measurement and project setup for LIB
+- **Compare Lib**: Compare cell/pin, measurement and project setup for LIB - TODO
+- **Abstract**: For large lib summarize
 
 ## Project Structure
 

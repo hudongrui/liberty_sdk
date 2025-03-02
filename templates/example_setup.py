@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='liberty_sdk',
-    version='v1.0.1',
+    name='APP_NAME',
+    version='VERSION_INFO',
     packages=find_packages(),
     install_requires=[
         'colorlog',
