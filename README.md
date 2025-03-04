@@ -27,7 +27,15 @@ Reference: https://media.c3d2.de/mgoblin_media/media_entries/659/Liberty_User_Gu
 
 To install the SDK, use the following command:
 ```commandline
-pip install
+pip install -r requirements.txt
+
+make build
+
+python3 -m venv venv # 创建venv虚拟机环境，可选 
+
+source venv/bin/activate
+
+pip3 -m pip install dist/liberty_sdk-$version-py3-none-any.whl
 ```
 
 ## Usage
