@@ -1,2 +1,0 @@
-5347dac3a5ff
-curl http://10.232.158.15:5000 --local-port 80

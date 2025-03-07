@@ -3,6 +3,9 @@ import json
 from liberty_sdk.tools.logger import setup_logger
 from liberty_sdk.parser.liberty_parser import LibertyParser, LibertyJSONEncoder
 
+# For building custom LIB
+from liberty_sdk.builder.liberty_builder import LibBuilder, atomic
+from liberty_sdk.parser.liberty_parser import LibertyGroup
 
 logger = setup_logger(log_file="parser.log")
 
@@ -23,41 +26,49 @@ output_lib = 'test/output_cell.lib'
 with open(output_lib, 'w') as f:
     f.write(library.dump(indent_value=True, indent_separator='  '))
 
-# Generate Test
-assert library.name == "cells"
+"""Build custom LIB"""
 
-# Test Simple Attribute
-attr = library.get('voltage_unit')
-logger.info(f"Test attribute 'voltage_unit': {attr}")
-assert attr == '"1V"'
 
-# Test Complex Attribute
-attr = library.get('voltage_map')
-logger.info(f"Test attribute: 'voltage_map': {attr}, type: {type(attr)}")
-assert str(attr) == "[['VDD', '0.75'], ['VSS', '0'], ['GND', '0']]"
+# subclass LibBuilder to your own Liberty-syntax clause builder
+class PinBuilder(LibBuilder):
+    """
+    Based on certain template.lib
+    """
 
-# Test nested complex attribute
-pin = library.get(cell='DFF', pin='ADR[8]')
-logger.info(f"Type of Pin: {type(pin)}")
-logger.info(pin)
-logger.info(pin.dump())
+    def build(self):
+        # Get necessary variables from database
+        self.lib = LibertyGroup("pin", self.name)
+        self.lib.set_params(
+            direction="input",
+            related_ground_pin=self.db.get("GND_PIN"),
+            related_power_pin=self.db.get("POWER_PIN"),
+            max_transition=self.db.get("MAX_TRAN"),
+        )
 
-# Test other cases
-template = library.get(lu_table_template='delay_temp_3x3')
-logger.info(template)
-idx = template.get("index_1")
-logger.info(f"Test for index_1: {idx}")
-# logger.info(idx.dump())
-assert idx == '1.0, 2.0, 3.0'
+        clause = atomic.TimingArc(
+            timing_type="hold_rising",
+            sdf_cond=self.db.get("SDF_COND"),
+            when_cond=self.db.get("WHEN_COND")
+        )
 
-# Test nested complex attribute
-p = library.get(cell='AND2', pin='o', timing="", cell_rise="delay_temp_3x3")
-# measure = p.get(timing="", cell_rise="delay_temp_3x3")
-values = p.get("values")
-logger.info(values)
+        self.lib.set_child(clause)
 
-# Test SET
-library.set(comment="This is a comment")
 
-# Set nested complex attributes
-library.set(cell='AND2', pin='o', timing="", cell_rise="delay_temp_3x3", values="value set")
+# Prepare value dictionary
+db = {
+    "POWER_PIN": "VSS",
+    "GND_PIN": "VDD",
+    "MAX_TRAN": 0.125,
+    "SDF_COND": "ENCLK",
+    "WHEN_COND": "!ENCLK"
+}
+indent_level = 0  # Use this to control sub-clause/indentation.
+
+builder = PinBuilder(
+    name="CLK",
+    db=db,
+    reference="some_template_clk.lib"
+)
+
+with open('tmp/generated_lib.lib', 'w') as f:
+    f.write(builder.dump(level=indent_level))

@@ -1,4 +1,3 @@
-import dataclasses
 import json
 import re
 from enum import Enum
@@ -101,7 +100,11 @@ class LibertyAttribute:
 
 @dataclass
 class ComplexLibertyAttribute:
-    """Complex Attribute"""
+    """
+    Complex Attribute
+    Such as:
+        index_1 (0.1 0.2 0.3);
+    """
     name: str
     params: List[str] = field(default_factory=list)
 
@@ -122,15 +125,15 @@ class ComplexLibertyAttribute:
 
     def dump(self, level=0, indent_value=True, indent_separator='  '):
         data = f"{indent(level=level, separator=indent_separator)}{self.name} ("
-
+        params = list(map(lambda x: f'"{x}"', self.params))
         # Value section
         if self.name == 'values' and indent_value is True:
             data += f" \\\n{indent(level=level+1, separator=indent_separator)}"
-            params = list(map(lambda x: f'"{x}"', self.params))
             data += f", \\\n{indent(level=level+1, separator=indent_separator)}".join(params)
             data += f"\\\n{indent(level=level, separator=indent_separator)}"
         else:
-            data += ", ".join(self.params)
+            # params = list(map(lambda x: f'"{x}"', self.params))
+            data += ", ".join(params)
         data += ");\n"
 
         return data
@@ -153,7 +156,7 @@ class LibertyGroup:
     def dump(self, level=0, indent_value=True, indent_separator='  '):
         data = f"{indent(level=level, separator=indent_separator)}{self.group_type} ({self.name}) {{\n"
         for k, v in self.params.items():
-            data += f"{indent(level=level + 1, separator=indent_separator)}{k}: {v};\n"
+            data += f"{indent(level=level + 1, separator=indent_separator)}{k} : {v};\n"
 
         for child in self.children:
             data += child.dump(
@@ -169,6 +172,13 @@ class LibertyGroup:
             return self.group_type == k and self.name == v
         else:
             return self.group_type == k
+
+    def set_params(self, *args, **kwargs):
+        for k, v in kwargs.items():
+            self.params.update({k: v})
+
+    def set_child(self, child):
+        self.children.append(child)
 
     @lru_cache(maxsize=1024)
     def get(self, *args, **kwargs):
